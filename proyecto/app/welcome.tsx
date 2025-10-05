@@ -5,6 +5,10 @@ import { Link } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 
+/**
+ * `WelcomeScreen` is a React functional component that renders the welcome screen of the application.
+
+ */
 export default function WelcomeScreen() {
   return (
     <ThemedView style={styles.container}>
