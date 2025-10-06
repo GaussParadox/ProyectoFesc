@@ -5,10 +5,7 @@ import { Link } from 'expo-router';
 import { ThemedView } from '@/components/themed-view';
 import { ThemedText } from '@/components/themed-text';
 
-/**
- * `WelcomeScreen` is a React functional component that renders the welcome screen of the application.
 
- */
 export default function WelcomeScreen() {
   return (
     <ThemedView style={styles.container}>
@@ -26,18 +23,21 @@ export default function WelcomeScreen() {
       <View style={styles.flexGrow} />
 
       <View style={styles.buttonWrapper}>
-        <Link href="/(tabs)" asChild>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Entrar"
-            style={({ pressed }) => [
-              styles.enterButton,
-              pressed && styles.enterButtonPressed,
-            ]}
-          >
-            <ThemedText type="defaultSemiBold" style={styles.enterText}>Entrar</ThemedText>
-          </Pressable>
-        </Link>
+        <View style={styles.enterBox}>
+          <Link href="/(tabs)" asChild>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Entrar"
+              android_ripple={{ color: 'rgba(255,255,255,0.18)' }}
+              style={({ pressed }) => [
+                styles.enterButton,
+                pressed && styles.enterButtonPressed,
+              ]}
+            >
+              <ThemedText type="defaultSemiBold" style={styles.enterText}>Entrar</ThemedText>
+            </Pressable>
+          </Link>
+        </View>
       </View>
 
       <View style={styles.bottomSpacer}/>
@@ -59,8 +59,8 @@ const styles = StyleSheet.create({
     height: 24,
   },
   card: {
-    width: 120,
-    height: 120,
+    width: 160,
+    height: 160,
     borderRadius: 0,
     backgroundColor: 'transparent',
     alignItems: 'center',
@@ -70,20 +70,22 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
     shadowRadius: 0,
     elevation: 0,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   icon: {
-    width: 96,
-    height: 96,
+    width: 130,
+    height: 130,
     resizeMode: 'contain',
   },
   title: {
     marginTop: 8,
     textAlign: 'center',
+    alignSelf: 'center',
   },
   subtitle: {
     marginTop: 6,
     textAlign: 'center',
+    alignSelf: 'center',
     color: '#666',
   },
   flexGrow: { flex: 1 },
@@ -93,11 +95,23 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     alignItems: 'center',
   },
-  enterButton: {
+  enterBox: {
     width: '100%',
     maxWidth: 420,
+    backgroundColor: '#ee0000ff',
+    borderRadius: 18,
+    padding: 6,
+    // sombra ligera
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  enterButton: {
+    width: '100%',
     alignSelf: 'center',
-    backgroundColor: '#c8102e',
+    backgroundColor: '#c8102e', // cambiar aquí si quieres otro rojo
     paddingVertical: 16,
     borderRadius: 14,
     alignItems: 'center',
@@ -109,12 +123,14 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   enterButtonPressed: {
-    opacity: 0.9,
+    opacity: 0.92,
   },
   enterText: {
-    color: '#000000ff',
+    color: '#ffffffff',
     fontSize: 16,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    textAlign: 'center',
+    alignSelf: 'center',
   },
 });
