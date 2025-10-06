@@ -1,0 +1,21 @@
+﻿// TEST: Trigger diario correcto
+// Para notificaciones DIARIAS necesitamos:
+// 1. Especificar SOLO hour y minute
+// 2. repeats: true
+// 3. NO especificar day, month, year
+
+// EJEMPLO CORRECTO:
+const dailyTrigger = {
+  hour: 19,  // 7 PM
+  minute: 30, // 30 minutos
+  repeats: true  // Se repite cada día a las 7:30 PM
+};
+
+// INCORRECTO (esto se ejecuta inmediatamente):
+const wrongTrigger = {
+  hour: 19,
+  minute: 30,
+  repeats: true
+} as any;  // El "as any" rompe la validación
+
+console.log("El trigger DEBE ser CalendarTriggerInput sin 'as any'");
