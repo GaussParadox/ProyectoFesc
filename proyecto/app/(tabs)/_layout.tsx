@@ -1,8 +1,8 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
+import { Home, Calendar, Mail } from 'lucide-react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
-import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -20,17 +20,23 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Horarios',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => <Home size={28} color={color} />,
         }}
       />
       <Tabs.Screen
         name="secondview"
         options={{
           title: 'Administrar',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="gear" color={color} />,
+          tabBarIcon: ({ color }) => <Calendar size={28} color={color} />,
         }}
       />
-      
+      <Tabs.Screen
+        name="contacto"
+        options={{
+          title: 'Contacto',
+          tabBarIcon: ({ color }) => <Mail size={28} color={color} />,
+        }}
+      />
     </Tabs>
   );
 }
