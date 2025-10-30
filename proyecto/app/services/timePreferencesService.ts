@@ -13,8 +13,8 @@ export type TimePreferences = {
 
 // Preferencias por defecto
 export const DEFAULT_TIME_PREFERENCE: TimePreference = {
-  openMinutesBefore: 60,  // 1 hora antes de abrir
-  closeMinutesBefore: 30, // 30 minutos antes de cerrar
+  openMinutesBefore: 60,  // 1 hora antes de abrir (predeterminado)
+  closeMinutesBefore: 45, // 45 minutos antes de cerrar (predeterminado)
 };
 
 /**
@@ -77,19 +77,19 @@ export async function updateTimePreference(
  */
 export const TIME_OPTIONS = {
   open: [
+    { label: '30 minutos antes', value: 30 },
+    { label: '45 minutos antes', value: 45 },
+    { label: '1 hora antes', value: 60 },
+    { label: '1.5 horas antes', value: 90 },
+    { label: '2 horas antes', value: 120 },
+    { label: '3 horas antes', value: 180 },
+  ],
+  close: [
     { label: '15 minutos antes', value: 15 },
     { label: '30 minutos antes', value: 30 },
     { label: '45 minutos antes', value: 45 },
     { label: '1 hora antes', value: 60 },
     { label: '1.5 horas antes', value: 90 },
     { label: '2 horas antes', value: 120 },
-  ],
-  close: [
-    { label: '5 minutos antes', value: 5 },
-    { label: '10 minutos antes', value: 10 },
-    { label: '15 minutos antes', value: 15 },
-    { label: '30 minutos antes', value: 30 },
-    { label: '45 minutos antes', value: 45 },
-    { label: '1 hora antes', value: 60 },
   ],
 };

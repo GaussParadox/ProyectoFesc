@@ -47,7 +47,7 @@
     
     await Notifications.scheduleNotificationAsync({
         content: {
-        title: "🧪 Prueba Inmediata",
+        title: "Prueba Inmediata",
         body: "Esta notificación se programó hace 5 segundos",
         sound: true,
         },
@@ -76,7 +76,7 @@
     
     const notifId = await Notifications.scheduleNotificationAsync({
         content: {
-        title: "🧪 Prueba Diaria",
+        title: "Prueba Diaria",
         body: `Programada para las ${hour}:${minute.toString().padStart(2, '0')}`,
         sound: true,
         },

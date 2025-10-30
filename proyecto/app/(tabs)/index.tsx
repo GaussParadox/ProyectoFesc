@@ -131,17 +131,35 @@ return (
           </ThemedText>
         </TouchableOpacity>
 
+      
+
+        {/* Botón de prueba de notificaciones con las áreas REALES */}
         <TouchableOpacity
-          style={[styles.notificationButton, { backgroundColor: '#ff0000ff' }]}
+          style={[styles.notificationButton, { backgroundColor: '#0004ffff' }]}
           activeOpacity={0.8}
           onPress={async () => {
-            const { debugScheduledNotifications } = await import('../services/debugService');
-            await debugScheduledNotifications();
-            Alert.alert('Debug', 'Revisa la consola para ver los detalles de las notificaciones programadas.');
+            try {
+              const { scheduleTestNotifications } = await import('../services/scheduleService');
+              const { loadTimePreferences } = await import('../services/timePreferencesService');
+              
+              // Usar las mismas áreas y configuraciones reales
+              const timePrefs = await loadTimePreferences();
+              const count = await scheduleTestNotifications(AREAS, areasStatus, timePrefs);
+              
+              const activeAreasCount = AREAS.filter(a => isAreaEnabled(a.id, areasStatus)).length;
+              
+              Alert.alert(
+                'Modo de Prueba Activado',
+                `📱 ${count} notificaciones programadas\n🔢 ${activeAreasCount} áreas activas\n\n⏰ Las notificaciones comenzarán a llegar en 5 segundos y cada 5 segundos después.\n\n📍 Son las MISMAS notificaciones reales pero con tiempo acelerado.`,
+                [{ text: 'OK' }]
+              );
+            } catch (error) {
+              Alert.alert('Error', 'No se pudieron programar las notificaciones de prueba');
+            }
           }}
         >
           <ThemedText type="defaultSemiBold" style={styles.notificationButtonText}>
-            Ver Notificaciones Programadas
+            Probar Notificaciones (5 seg)
           </ThemedText>
         </TouchableOpacity>
         
