@@ -1,11 +1,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { ScrollView, StyleSheet, View, TouchableOpacity, Alert } from 'react-native';
+import { ScrollView, StyleSheet, View, TouchableOpacity, Alert, Platform, Modal, Pressable } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Bell, Clock, X, DoorOpen, DoorClosed } from 'lucide-react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { AREAS } from '../services/areasData';
 import { loadAreasStatus, isAreaEnabled, type AreaStatus } from '../services/storageService';
-import { loadTimePreferences, updateTimePreference, getTimePreference, TIME_OPTIONS, type TimePreferences, type TimePreference } from '../services/timePreferencesService';
+import { loadTimePreferences, updateTimePreference, getTimePreference, formatTimePreference, isNotificationConfigured, type TimePreferences, type TimePreference } from '../services/timePreferencesService';
 import { reprogramAllNotifications } from '../services/scheduleService';
 import { parseSchedule, formatTime } from '../services/scheduleService';
 
@@ -18,11 +20,19 @@ type AreaConfig = {
     timePreference: TimePreference;
 };
 
+type PickerMode = {
+    areaId: string;
+    areaTitle: string;
+    type: 'open' | 'close';
+} | null;
+
 export default function ManageSchedulesScreen() {
     const [areasStatus, setAreasStatus] = useState<AreaStatus>({});
     const [timePreferences, setTimePreferences] = useState<TimePreferences>({});
     const [activeAreas, setActiveAreas] = useState<AreaConfig[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [pickerMode, setPickerMode] = useState<PickerMode>(null);
+    const [selectedTime, setSelectedTime] = useState(new Date());
 
     // Cargar datos cuando la pantalla se enfoca (cada vez que cambias de pestaña)
     useFocusEffect(
@@ -63,14 +73,14 @@ export default function ManageSchedulesScreen() {
         }
     };
 
-    const handleUpdateTime = async (areaId: string, type: 'open' | 'close', minutes: number) => {
+    const handleUpdateTime = async (areaId: string, type: 'open' | 'close', hour: number, minute: number) => {
         try {
             const area = activeAreas.find(a => a.id === areaId);
             if (!area) return;
 
             const updatedPref: TimePreference = {
                 ...area.timePreference,
-                [type === 'open' ? 'openMinutesBefore' : 'closeMinutesBefore']: minutes,
+                [type === 'open' ? 'openNotificationTime' : 'closeNotificationTime']: { hour, minute },
             };
 
             const newPrefs = await updateTimePreference(areaId, updatedPref, timePreferences);
@@ -88,48 +98,94 @@ export default function ManageSchedulesScreen() {
             // Reprogramar notificaciones con nuevos tiempos
             await reprogramAllNotifications(AREAS, areasStatus, newPrefs);
 
-            console.log(`✅ ${area.title} - ${type === 'open' ? 'Apertura' : 'Cierre'} actualizado a ${minutes} minutos`);
+            const formattedTime = formatTime(hour, minute);
+            console.log(`✅ ${area.title} - Notificación de ${type === 'open' ? 'apertura' : 'cierre'} actualizada a ${formattedTime}`);
+            
+            Alert.alert(
+                'Horario configurado',
+                `La notificación de ${type === 'open' ? 'apertura' : 'cierre'} de "${area.title}" llegará a las ${formattedTime}`,
+                [{ text: 'Entendido' }]
+            );
         } catch (error) {
             console.error('Error actualizando tiempo:', error);
-            Alert.alert('❌ Error', 'No se pudo actualizar la preferencia');
+            Alert.alert('Error', 'No se pudo actualizar la preferencia');
         }
     };
 
-    const showTimeOptions = (areaId: string, areaTitle: string, type: 'open' | 'close') => {
-        const options = type === 'open' ? TIME_OPTIONS.open : TIME_OPTIONS.close;
-        const title = type === 'open' ? 'Notificación de Apertura' : 'Notificación de Cierre';
+    const showTimePicker = (areaId: string, areaTitle: string, type: 'open' | 'close') => {
+        const area = activeAreas.find(a => a.id === areaId);
+        if (!area) return;
+
+        // Obtener tiempo actual configurado o usar hora actual
+        let initialTime = new Date();
+        if (type === 'open' && isNotificationConfigured(area.timePreference.openNotificationTime)) {
+            const { hour, minute } = area.timePreference.openNotificationTime;
+            initialTime = new Date();
+            initialTime.setHours(hour, minute, 0, 0);
+        } else if (type === 'close' && isNotificationConfigured(area.timePreference.closeNotificationTime)) {
+            const { hour, minute } = area.timePreference.closeNotificationTime;
+            initialTime = new Date();
+            initialTime.setHours(hour, minute, 0, 0);
+        }
+
+        setSelectedTime(initialTime);
+        setPickerMode({ areaId, areaTitle, type });
+    };
+
+    const handleTimeSelected = (event: any, date?: Date) => {
+        if (Platform.OS === 'android') {
+            setPickerMode(null);
+        }
+
+        if (event.type === 'set' && date && pickerMode) {
+            const hour = date.getHours();
+            const minute = date.getMinutes();
+            handleUpdateTime(pickerMode.areaId, pickerMode.type, hour, minute);
+            
+            if (Platform.OS === 'ios') {
+                setPickerMode(null);
+            }
+        } else if (event.type === 'dismissed') {
+            setPickerMode(null);
+        }
+    };
+
+    const handleClearNotification = async (areaId: string, type: 'open' | 'close') => {
+        const area = activeAreas.find(a => a.id === areaId);
+        if (!area) return;
 
         Alert.alert(
-            `${title}`,
-            `${areaTitle}\n\nSelecciona cuánto tiempo antes quieres recibir la notificación:`,
+            'Eliminar notificación',
+            `¿Deseas eliminar la notificación de ${type === 'open' ? 'apertura' : 'cierre'} de "${area.title}"?`,
             [
-                ...options.map(opt => ({
-                    text: opt.label,
-                    onPress: () => handleUpdateTime(areaId, type, opt.value),
-                })),
-                { 
-                    text: 'Cancelar', 
-                    style: 'cancel',
-                    onPress: () => {
-                        // No hacer nada, solo cerrar el diálogo
-                    }
-                },
-            ],
-            {
-                cancelable: true, // Permite cerrar tocando fuera del diálogo
-                onDismiss: () => {
-                    // Se ejecuta cuando se cierra sin seleccionar
-                }
-            }
-        );
-    };
+                { text: 'Cancelar', style: 'cancel' },
+                {
+                    text: 'Eliminar',
+                    style: 'destructive',
+                    onPress: async () => {
+                        const updatedPref: TimePreference = {
+                            ...area.timePreference,
+                            [type === 'open' ? 'openNotificationTime' : 'closeNotificationTime']: { hour: -1, minute: -1 },
+                        };
 
-    const getTimeLabel = (minutes: number): string => {
-        if (minutes < 60) {
-            return `${minutes} min antes`;
-        }
-        const hours = minutes / 60;
-        return hours === 1 ? '1 hora antes' : `${hours} horas antes`;
+                        const newPrefs = await updateTimePreference(areaId, updatedPref, timePreferences);
+                        setTimePreferences(newPrefs);
+
+                        setActiveAreas(prev =>
+                            prev.map(a =>
+                                a.id === areaId
+                                    ? { ...a, timePreference: updatedPref }
+                                    : a
+                            )
+                        );
+
+                        await reprogramAllNotifications(AREAS, areasStatus, newPrefs);
+                        
+                        Alert.alert('Notificación eliminada', `Ya no recibirás notificaciones de ${type === 'open' ? 'apertura' : 'cierre'} para esta área.`);
+                    }
+                }
+            ]
+        );
     };
 
     if (isLoading) {
@@ -183,37 +239,78 @@ export default function ManageSchedulesScreen() {
                             </View>
 
                             <View style={styles.timeSection}>
-                                <ThemedText style={styles.sectionLabel}>🔔 Notificaciones:</ThemedText>
+                                <View style={styles.sectionHeader}>
+                                    <Bell size={16} color="#666" />
+                                    <ThemedText style={styles.sectionLabel}>Horarios de Notificación</ThemedText>
+                                </View>
 
                                 {/* Configuración de apertura */}
-                                <TouchableOpacity
-                                    style={styles.timeOption}
-                                    onPress={() => showTimeOptions(area.id, area.title, 'open')}
-                                    activeOpacity={0.7}
-                                >
-                                    <View style={styles.timeOptionContent}>
-                                        <ThemedText style={styles.timeLabel}>Apertura ({area.openTime})</ThemedText>
-                                        <ThemedText style={styles.timeValue}>
-                                            {getTimeLabel(area.timePreference.openMinutesBefore)}
-                                        </ThemedText>
-                                    </View>
-                                    <ThemedText style={styles.chevron}>›</ThemedText>
-                                </TouchableOpacity>
+                                <View style={styles.notificationRow}>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.timeOption,
+                                            isNotificationConfigured(area.timePreference.openNotificationTime) && styles.timeOptionConfigured
+                                        ]}
+                                        onPress={() => showTimePicker(area.id, area.title, 'open')}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View style={styles.timeOptionIcon}>
+                                            <DoorOpen size={20} color={isNotificationConfigured(area.timePreference.openNotificationTime) ? "#4caf50" : "#999"} />
+                                        </View>
+                                        <View style={styles.timeOptionContent}>
+                                            <ThemedText style={styles.timeLabel}>Apertura ({area.openTime})</ThemedText>
+                                            <ThemedText style={[
+                                                styles.timeValue,
+                                                !isNotificationConfigured(area.timePreference.openNotificationTime) && styles.timeValueUnconfigured
+                                            ]}>
+                                                {formatTimePreference(area.timePreference.openNotificationTime)}
+                                            </ThemedText>
+                                        </View>
+                                        <Clock size={20} color="#999" style={styles.chevron} />
+                                    </TouchableOpacity>
+                                    {isNotificationConfigured(area.timePreference.openNotificationTime) && (
+                                        <TouchableOpacity
+                                            style={styles.clearButton}
+                                            onPress={() => handleClearNotification(area.id, 'open')}
+                                        >
+                                            <X size={18} color="#d32f2f" />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
 
                                 {/* Configuración de cierre */}
-                                <TouchableOpacity
-                                    style={styles.timeOption}
-                                    onPress={() => showTimeOptions(area.id, area.title, 'close')}
-                                    activeOpacity={0.7}
-                                >
-                                    <View style={styles.timeOptionContent}>
-                                        <ThemedText style={styles.timeLabel}>Cierre ({area.closeTime})</ThemedText>
-                                        <ThemedText style={styles.timeValue}>
-                                            {getTimeLabel(area.timePreference.closeMinutesBefore)}
-                                        </ThemedText>
-                                    </View>
-                                    <ThemedText style={styles.chevron}>›</ThemedText>
-                                </TouchableOpacity>
+                                <View style={styles.notificationRow}>
+                                    <TouchableOpacity
+                                        style={[
+                                            styles.timeOption,
+                                            isNotificationConfigured(area.timePreference.closeNotificationTime) && styles.timeOptionConfigured
+                                        ]}
+                                        onPress={() => showTimePicker(area.id, area.title, 'close')}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View style={styles.timeOptionIcon}>
+                                            <DoorClosed size={20} color={isNotificationConfigured(area.timePreference.closeNotificationTime) ? "#4caf50" : "#999"} />
+                                        </View>
+                                        <View style={styles.timeOptionContent}>
+                                            <ThemedText style={styles.timeLabel}>Cierre ({area.closeTime})</ThemedText>
+                                            <ThemedText style={[
+                                                styles.timeValue,
+                                                !isNotificationConfigured(area.timePreference.closeNotificationTime) && styles.timeValueUnconfigured
+                                            ]}>
+                                                {formatTimePreference(area.timePreference.closeNotificationTime)}
+                                            </ThemedText>
+                                        </View>
+                                        <Clock size={20} color="#999" style={styles.chevron} />
+                                    </TouchableOpacity>
+                                    {isNotificationConfigured(area.timePreference.closeNotificationTime) && (
+                                        <TouchableOpacity
+                                            style={styles.clearButton}
+                                            onPress={() => handleClearNotification(area.id, 'close')}
+                                        >
+                                            <X size={18} color="#d32f2f" />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
                             </View>
                         </View>
                     ))}
@@ -221,11 +318,62 @@ export default function ManageSchedulesScreen() {
 
                 <View style={styles.helpBox}>
                     <ThemedText style={styles.helpText}>
-                        <ThemedText style={styles.helpBold}>Consejo:</ThemedText> Las notificaciones se enviarán
-                        automáticamente según tus preferencias cada día a la hora configurada.
+                        <ThemedText style={styles.helpBold}>Consejo:</ThemedText> Configura la hora exacta en la que deseas recibir cada notificación.
+                        Las notificaciones se enviarán automáticamente todos los días a la hora que configures.
                     </ThemedText>
                 </View>
             </ScrollView>
+
+            {/* Modal para iOS con DateTimePicker */}
+            {Platform.OS === 'ios' && pickerMode && (
+                <Modal
+                    transparent
+                    animationType="slide"
+                    visible={pickerMode !== null}
+                    onRequestClose={() => setPickerMode(null)}
+                >
+                    <Pressable style={styles.modalOverlay} onPress={() => setPickerMode(null)}>
+                        <View style={styles.modalContent}>
+                            <View style={styles.modalHeader}>
+                                <ThemedText type="defaultSemiBold" style={styles.modalTitle}>
+                                    {pickerMode.areaTitle}
+                                </ThemedText>
+                                <ThemedText style={styles.modalSubtitle}>
+                                    Notificación de {pickerMode.type === 'open' ? 'Apertura' : 'Cierre'}
+                                </ThemedText>
+                            </View>
+                            <DateTimePicker
+                                value={selectedTime}
+                                mode="time"
+                                display="spinner"
+                                onChange={handleTimeSelected}
+                                style={styles.timePicker}
+                            />
+                            <TouchableOpacity
+                                style={styles.modalButton}
+                                onPress={() => {
+                                    const hour = selectedTime.getHours();
+                                    const minute = selectedTime.getMinutes();
+                                    handleUpdateTime(pickerMode.areaId, pickerMode.type, hour, minute);
+                                    setPickerMode(null);
+                                }}
+                            >
+                                <ThemedText style={styles.modalButtonText}>Confirmar</ThemedText>
+                            </TouchableOpacity>
+                        </View>
+                    </Pressable>
+                </Modal>
+            )}
+
+            {/* DateTimePicker para Android */}
+            {Platform.OS === 'android' && pickerMode && (
+                <DateTimePicker
+                    value={selectedTime}
+                    mode="time"
+                    display="default"
+                    onChange={handleTimeSelected}
+                />
+            )}
         </ThemedView>
     );
 }
@@ -291,21 +439,48 @@ const styles = StyleSheet.create({
     areaTitle: { fontSize: 17, marginBottom: 4 },
     areaSubtitle: { fontSize: 14, opacity: 0.6 },
     
-    timeSection: { gap: 8 },
+    timeSection: { gap: 12 },
+    sectionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 4,
+    },
     sectionLabel: {
         fontSize: 14,
         fontWeight: '600',
-        marginBottom: 4,
         opacity: 0.7,
     },
     
+    notificationRow: {
+        flexDirection: 'row',
+        gap: 8,
+        alignItems: 'center',
+    },
+    
     timeOption: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         backgroundColor: '#f5f5f5',
         padding: 12,
         borderRadius: 8,
+        borderWidth: 2,
+        borderColor: 'transparent',
+        gap: 12,
+    },
+    timeOptionConfigured: {
+        backgroundColor: '#e8f5e9',
+        borderColor: '#4caf50',
+    },
+    timeOptionIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#fff',
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     timeOptionContent: { flex: 1 },
     timeLabel: {
@@ -314,14 +489,28 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     timeValue: {
-        fontSize: 13,
+        fontSize: 15,
         color: '#4caf50',
-        fontWeight: '600',
+        fontWeight: '700',
+    },
+    timeValueUnconfigured: {
+        color: '#999',
+        fontWeight: '500',
+        fontStyle: 'italic',
     },
     chevron: {
-        fontSize: 24,
-        color: '#999',
         marginLeft: 8,
+    },
+    
+    clearButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#ffebee',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#ef5350',
     },
 
     helpBox: {
@@ -337,6 +526,49 @@ const styles = StyleSheet.create({
         color: '#5d4037',
     },
     helpBold: {
+        fontWeight: '700',
+    },
+
+    // Estilos del modal (iOS)
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: '#fff',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 20,
+        paddingBottom: 40,
+    },
+    modalHeader: {
+        marginBottom: 16,
+        alignItems: 'center',
+    },
+    modalTitle: {
+        fontSize: 18,
+        marginBottom: 4,
+        color: '#000',
+    },
+    modalSubtitle: {
+        fontSize: 14,
+        color: '#666',
+    },
+    timePicker: {
+        height: 200,
+        marginVertical: 8,
+    },
+    modalButton: {
+        backgroundColor: '#4caf50',
+        padding: 16,
+        borderRadius: 8,
+        alignItems: 'center',
+        marginTop: 16,
+    },
+    modalButtonText: {
+        color: '#fff',
+        fontSize: 16,
         fontWeight: '700',
     },
 });

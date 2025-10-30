@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Home, Calendar, Mail } from 'lucide-react-native';
+import { Home, Calendar } from 'lucide-react-native';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { Colors } from '@/constants/theme';
@@ -28,13 +28,6 @@ export default function TabLayout() {
         options={{
           title: 'Administrar',
           tabBarIcon: ({ color }) => <Calendar size={28} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="contacto"
-        options={{
-          title: 'Contacto',
-          tabBarIcon: ({ color }) => <Mail size={28} color={color} />,
         }}
       />
     </Tabs>

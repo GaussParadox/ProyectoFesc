@@ -54,7 +54,12 @@ interface Area {
   subtitle: string;
 }
 
-type TimePreferences = { [areaId: string]: { openMinutesBefore: number; closeMinutesBefore: number } };
+type TimePreferences = { 
+  [areaId: string]: { 
+    openNotificationTime: { hour: number; minute: number };
+    closeNotificationTime: { hour: number; minute: number };
+  } 
+};
 
 export async function scheduleNotificationsForAreas(
   areas: Area[],
@@ -64,7 +69,7 @@ export async function scheduleNotificationsForAreas(
   try {
     await Notifications.cancelAllScheduledNotificationsAsync();
 
-    console.log("Programando notificaciones...");
+    console.log("📅 Programando notificaciones con horarios personalizados...");
     let scheduledCount = 0;
 
     const now = new Date();
@@ -72,66 +77,68 @@ export async function scheduleNotificationsForAreas(
     const currentMinute = now.getMinutes();
     const currentTimeStr = formatTime(currentHour, currentMinute);
     
-    console.log(` Hora actual: ${currentTimeStr} (${currentHour}:${currentMinute})`);
+    console.log(`⏰ Hora actual: ${currentTimeStr} (${currentHour}:${currentMinute})`);
 
     for (const area of areas) {
       // Verificar si el área está habilitada
       const enabled = areasStatus[area.id] !== false;
 
       if (!enabled) {
-        console.log(`Saltando "${area.title}" - desactivada`);
+        console.log(`⏭️ Saltando "${area.title}" - desactivada`);
         continue;
       }
 
       const schedule = parseSchedule(area.subtitle);
       if (!schedule) {
-        console.warn(` No se pudo parsear el horario: ${area.subtitle}`);
+        console.warn(`⚠️ No se pudo parsear el horario: ${area.subtitle}`);
         continue;
       }
 
       const openTime = convertTo24Hour(schedule.openTime);
       const closeTime = convertTo24Hour(schedule.closeTime);
 
-      // Obtener preferencias de tiempo personalizadas o usar valores por defecto
-      const prefs = timePreferences?.[area.id] || { openMinutesBefore: 60, closeMinutesBefore: 30 };
+      // Obtener preferencias de tiempo personalizadas
+      const prefs = timePreferences?.[area.id];
+      
+      // Notificación de apertura (solo si está configurada)
+      if (prefs?.openNotificationTime && prefs.openNotificationTime.hour !== -1) {
+        const notifyOpen = prefs.openNotificationTime;
+        
+        console.log(`🔔 ${area.title} - Notificación de apertura: ${formatTime(notifyOpen.hour, notifyOpen.minute)}`);
+        
+        await scheduleDailyNotification(
+          notifyOpen.hour,
+          notifyOpen.minute,
+          `📢 ${area.title} abrirá pronto`,
+          `Horario de apertura: ${formatTime(openTime.hour, openTime.minute)}`
+        );
+        scheduledCount++;
+      } else {
+        console.log(`⏸️ ${area.title} - Notificación de apertura no configurada`);
+      }
 
-      // Notificación de apertura
-      const notifyOpen = subtractMinutes(openTime.hour, openTime.minute, prefs.openMinutesBefore);
-      const openLabel = prefs.openMinutesBefore >= 60 
-        ? `${prefs.openMinutesBefore / 60} hora${prefs.openMinutesBefore > 60 ? 's' : ''}`
-        : `${prefs.openMinutesBefore} minutos`;
-      
-      console.log(`${area.title} - Apertura: ${formatTime(notifyOpen.hour, notifyOpen.minute)} (Abre: ${formatTime(openTime.hour, openTime.minute)})`);
-      
-      await scheduleDailyNotification(
-        notifyOpen.hour,
-        notifyOpen.minute,
-        `${area.title} abrirá pronto`,
-        `Abrirá en ${openLabel} (${formatTime(openTime.hour, openTime.minute)})`
-      );
-      scheduledCount++;
-
-      // Notificación de cierre
-      const notifyClose = subtractMinutes(closeTime.hour, closeTime.minute, prefs.closeMinutesBefore);
-      const closeLabel = prefs.closeMinutesBefore >= 60
-        ? `${prefs.closeMinutesBefore / 60} hora${prefs.closeMinutesBefore > 60 ? 's' : ''}`
-        : `${prefs.closeMinutesBefore} minutos`;
-      
-      console.log(`${area.title} - Cierre: ${formatTime(notifyClose.hour, notifyClose.minute)} (Cierra: ${formatTime(closeTime.hour, closeTime.minute)})`);
-      
-      await scheduleDailyNotification(
-        notifyClose.hour,
-        notifyClose.minute,
-        `${area.title} cerrará pronto`,
-        `Cerrará en ${closeLabel} (${formatTime(closeTime.hour, closeTime.minute)})`
-      );
-      scheduledCount++;
+      // Notificación de cierre (solo si está configurada)
+      if (prefs?.closeNotificationTime && prefs.closeNotificationTime.hour !== -1) {
+        const notifyClose = prefs.closeNotificationTime;
+        
+        console.log(`🔔 ${area.title} - Notificación de cierre: ${formatTime(notifyClose.hour, notifyClose.minute)}`);
+        
+        await scheduleDailyNotification(
+          notifyClose.hour,
+          notifyClose.minute,
+          `⏰ ${area.title} cerrará pronto`,
+          `Horario de cierre: ${formatTime(closeTime.hour, closeTime.minute)}`
+        );
+        scheduledCount++;
+      } else {
+        console.log(`⏸️ ${area.title} - Notificación de cierre no configurada`);
+      }
     }
 
-    console.log(`Total: ${scheduledCount} notificaciones`);
+    console.log(`✅ Total: ${scheduledCount} notificaciones programadas`);
     return scheduledCount;
   } catch (error) {
-    console.error(" Error al programar notificaciones:", error);
+    console.error("❌ Error al programar notificaciones:", error);
     throw error;
   }
 }
@@ -175,95 +182,3 @@ export async function reprogramAllNotifications(
         return {};
     }
     }
-
-/**
- * Programar notificaciones de prueba (mismo sistema pero en 5 segundos)
- * Usa las mismas áreas y configuraciones reales, pero trigger inmediato
- */
-export async function scheduleTestNotifications(
-  areas: Area[],
-  areasStatus: { [key: string]: boolean },
-  timePreferences?: TimePreferences
-): Promise<number> {
-  try {
-    await Notifications.cancelAllScheduledNotificationsAsync();
-    
-    console.log("Programando notificaciones de PRUEBA (5 segundos)...");
-    let scheduledCount = 0;
-    let delaySeconds = 5; // Tiempo base inicial
-
-    for (const area of areas) {
-      // Verificar si el área está habilitada
-      const enabled = areasStatus[area.id] !== false;
-
-      if (!enabled) {
-        console.log(`⏭️ Saltando "${area.title}" - desactivada`);
-        continue;
-      }
-
-      const schedule = parseSchedule(area.subtitle);
-      if (!schedule) {
-        console.warn(`⚠️ No se pudo parsear el horario: ${area.subtitle}`);
-        continue;
-      }
-
-      const openTime = convertTo24Hour(schedule.openTime);
-      const closeTime = convertTo24Hour(schedule.closeTime);
-
-      // Obtener preferencias de tiempo personalizadas o usar valores por defecto
-      const prefs = timePreferences?.[area.id] || { openMinutesBefore: 60, closeMinutesBefore: 45 };
-
-      // Notificación de apertura (en 5 segundos)
-      const openLabel = prefs.openMinutesBefore >= 60 
-        ? `${prefs.openMinutesBefore / 60} hora${prefs.openMinutesBefore > 60 ? 's' : ''}`
-        : `${prefs.openMinutesBefore} minutos`;
-      
-      console.log(`🧪 ${area.title} - Notificación de apertura en ${delaySeconds} segundos`);
-      
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: `📢 ${area.title} abrirá pronto`,
-          body: `PRUEBA: Abrirá en ${openLabel} (${formatTime(openTime.hour, openTime.minute)})`,
-          sound: true,
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-          data: { test: true, area: area.id, type: 'open' },
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: delaySeconds,
-        },
-      });
-      scheduledCount++;
-      delaySeconds += 5; // Incrementar para que no lleguen todas juntas
-
-      // Notificación de cierre (en 10 segundos más)
-      const closeLabel = prefs.closeMinutesBefore >= 60
-        ? `${prefs.closeMinutesBefore / 60} hora${prefs.closeMinutesBefore > 60 ? 's' : ''}`
-        : `${prefs.closeMinutesBefore} minutos`;
-      
-      console.log(`🧪 ${area.title} - Notificación de cierre en ${delaySeconds} segundos`);
-      
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: `⏰ ${area.title} cerrará pronto`,
-          body: `PRUEBA: Cerrará en ${closeLabel} (${formatTime(closeTime.hour, closeTime.minute)})`,
-          sound: true,
-          priority: Notifications.AndroidNotificationPriority.HIGH,
-          data: { test: true, area: area.id, type: 'close' },
-        },
-        trigger: {
-          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-          seconds: delaySeconds,
-        },
-      });
-      scheduledCount++;
-      delaySeconds += 5; // Incrementar para la siguiente área
-    }
-
-    console.log(`✅ ${scheduledCount} notificaciones de PRUEBA programadas`);
-    return scheduledCount;
-  } catch (error) {
-    console.error("❌ Error programando notificaciones de prueba:", error);
-    throw error;
-  }
-}
