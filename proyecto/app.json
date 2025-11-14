@@ -4,7 +4,7 @@
     "slug": "proyecto",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/Logofesc.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "proyecto",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -45,12 +45,10 @@
         {
           "icon": "./assets/images/Logofesc.png",
           "color": "#d81b25",
-          "sounds": [
-            "default"
-          ],
           "mode": "production"
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -59,7 +57,7 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "1d4e41e7-838e-4a97-9031-26a302b0b45e"
+        "projectId": "ef208b4a-0a83-45ab-8432-3addf59171e5"
       }
     }
   }
